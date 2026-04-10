@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Meeting Intelligence Hub</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <div class="bg-layer"></div>
+    <main class="container">
+      <header class="hero">
+        <p class="tag">Meeting Intelligence</p>
+        <h1>Meeting Intelligence Hub</h1>
+        <p class="subtitle">
+          Upload transcripts, review decisions and action items, and ask questions with grounded answers.
+        </p>
+      </header>
+
+      <section class="card">
+        <h2>1) Upload Transcript</h2>
+        <p class="section-note">Add one or more .txt or .vtt files. You will see draft insights immediately, then enhanced insights when available.</p>
+        <div class="row">
+          <input id="projectInput" type="text" placeholder="Project name (for example: Launch Revamp)" />
+          <input id="meetingDateInput" type="date" />
+        </div>
+        <div class="row">
+          <input id="fileInput" type="file" accept=".txt,.vtt" multiple />
+          <button id="uploadBtn">Upload And Analyze</button>
+        </div>
+        <p id="uploadStatus" class="status"></p>
+        <pre id="metadataBox" class="codebox"></pre>
+      </section>
+
+      <section class="grid">
+        <article class="card">
+          <h2>2) AI Extracted Insights</h2>
+          <h3>Decisions</h3>
+          <ul id="decisionsList"></ul>
+          <h3>Action Items</h3>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Person</th>
+                  <th>Task</th>
+                  <th>Deadline</th>
+                </tr>
+              </thead>
+              <tbody id="actionsTableBody"></tbody>
+            </table>
+          </div>
+
+          <h3>Sentiment Timeline</h3>
+          <ul id="sentimentTimeline" class="timeline-list"></ul>
+
+          <h3>Speaker Sentiment Summary</h3>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Speaker</th>
+                  <th>Agreement</th>
+                  <th>Conflict</th>
+                  <th>Frustration</th>
+                  <th>Neutral</th>
+                </tr>
+              </thead>
+              <tbody id="speakerSummaryBody"></tbody>
+            </table>
+          </div>
+        </article>
+
+        <article class="card">
+          <h2>3) Ask the Chatbot</h2>
+          <p class="section-note">Use a single meeting or all uploaded meetings as your chat context.</p>
+          <label for="meetingSelect">Chat Context</label>
+          <select id="meetingSelect">
+            <option value="">Select a meeting</option>
+          </select>
+          <textarea id="questionInput" rows="5" placeholder="Example: Why was launch delayed?"></textarea>
+          <div class="row">
+            <button id="askBtn">Ask</button>
+          </div>
+          <p id="geminiBadge" class="gemini-badge" hidden></p>
+          <p id="chatMode" class="status"></p>
+          <pre id="answerBox" class="codebox"></pre>
+          <h3>Sources</h3>
+          <ol id="sourcesList"></ol>
+        </article>
+      </section>
+    </main>
+
+    <script src="/static/app.js"></script>
+  </body>
+</html>

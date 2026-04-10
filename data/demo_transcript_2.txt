@@ -1,0 +1,8 @@
+Product Readiness Sync - April 10
+
+Nina: We reviewed the release checklist and agreed to move customer beta to next Wednesday.
+Arjun: I will finalize the onboarding emails by Tuesday and share drafts with marketing.
+Lena: We decided to keep pricing unchanged for this release cycle.
+Nina: Action item: Arjun will coordinate with support to publish the FAQ update by Friday.
+Lena: I am concerned about the volume of unresolved UI bugs.
+Nina: We agreed to run a focused bug triage session every morning until beta launch.

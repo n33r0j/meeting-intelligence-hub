@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Environment files
+.env
+
+# macOS / editor
+.DS_Store
+.vscode/
+
+# Logs and caches
+*.log
+.pytest_cache/
+.mypy_cache/
+
+# Local data stores
+backend/data/*.db
+data/*.db

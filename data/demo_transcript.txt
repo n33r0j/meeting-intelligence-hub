@@ -1,0 +1,8 @@
+Project Sync - April 9
+
+Aisha: We reviewed launch blockers. We decided to delay launch by two weeks so QA can complete regression testing.
+Rahul: I will fix the payment API bug by Friday and share a patch with the backend team.
+Mina: Finance agreed to increase ad budget by 15 percent for the new launch window.
+Aisha: Action item: Mina will update the campaign calendar by Monday.
+Rahul: I am frustrated that staging data is still inconsistent.
+Aisha: We agreed to run a daily 15-minute standup until launch readiness is green.
