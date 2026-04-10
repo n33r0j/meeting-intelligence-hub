@@ -107,6 +107,39 @@ body {
   gap: 0.65rem;
 }
 
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.7rem;
+  margin-bottom: 0.8rem;
+}
+
+.stat-card {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.86);
+  padding: 0.7rem;
+}
+
+.stat-card span {
+  display: block;
+  font-size: 0.76rem;
+  color: var(--muted);
+}
+
+.stat-card strong {
+  display: block;
+  font-size: 1.2rem;
+  margin-top: 0.2rem;
+}
+
+.recent-list {
+  margin: 0;
+  padding-left: 1rem;
+  color: #3e4450;
+  font-size: 0.9rem;
+}
+
 h2,
 h3 {
   margin-top: 0;
@@ -129,6 +162,38 @@ h3 {
   color: var(--muted);
   font-size: 0.92rem;
   line-height: 1.45;
+}
+
+.drop-zone {
+  border: 1.5px dashed rgba(0, 113, 227, 0.45);
+  background: rgba(255, 255, 255, 0.78);
+  color: #3f4a59;
+  border-radius: 14px;
+  text-align: center;
+  padding: 0.9rem;
+  margin-bottom: 0.65rem;
+  transition: border-color 140ms ease, background-color 140ms ease;
+}
+
+.drop-zone.drag-active {
+  border-color: rgba(0, 113, 227, 0.85);
+  background: rgba(237, 246, 255, 0.9);
+}
+
+.progress-wrap {
+  width: 100%;
+  height: 8px;
+  background: #e8edf4;
+  border-radius: 999px;
+  overflow: hidden;
+  margin-top: 0.1rem;
+}
+
+.progress-bar {
+  width: 0%;
+  height: 100%;
+  background: linear-gradient(90deg, #0071e3, #2e9bff);
+  transition: width 180ms ease;
 }
 
 input[type="file"],
@@ -219,6 +284,55 @@ ol {
   border-radius: 12px;
   padding: 0.54rem 0.66rem;
   font-size: 0.92rem;
+  cursor: pointer;
+}
+
+.timeline-item.active {
+  border-color: rgba(0, 113, 227, 0.72);
+  box-shadow: inset 0 0 0 1px rgba(0, 113, 227, 0.18);
+}
+
+.sentiment-bars {
+  display: grid;
+  gap: 0.36rem;
+  margin-bottom: 0.55rem;
+}
+
+.tone-row {
+  display: grid;
+  grid-template-columns: 88px 1fr 28px;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.84rem;
+  color: #3d4452;
+}
+
+.tone-track {
+  height: 8px;
+  border-radius: 999px;
+  background: #eaf0f6;
+  overflow: hidden;
+}
+
+.tone-fill {
+  height: 100%;
+  min-width: 2px;
+}
+
+.tone-agreement {
+  background: #2e9f57;
+}
+
+.tone-conflict {
+  background: #d0892a;
+}
+
+.tone-frustration {
+  background: #cd4a4a;
+}
+
+.tone-neutral {
+  background: #7c8798;
 }
 
 .sentiment-chip {
@@ -286,6 +400,10 @@ textarea {
 }
 
 @media (max-width: 900px) {
+  .stats-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .grid {
     grid-template-columns: 1fr;
   }

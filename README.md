@@ -18,6 +18,33 @@ A lightweight AI system that transforms meeting transcripts into actionable insi
 - LLM (optional): Gemini API for extraction and answer generation
 - Frontend: HTML, CSS, vanilla JS
 
+## Architecture
+
+1. Transcript is uploaded and parsed
+2. Text is chunked into smaller segments
+3. Embeddings are generated using Sentence Transformers
+4. Stored in FAISS vector index for similarity search
+5. User query is embedded and matched with relevant chunks
+6. Retrieved context is passed to LLM (or fallback logic)
+7. Final answer is generated with source citations
+
+Why this matters:
+- Recruiters scan for system thinking
+- Shows you understand RAG pipeline clearly
+
+## Design Decisions
+
+- Used FAISS for fast local vector search instead of external DB
+- SQLite used for lightweight metadata storage in MVP
+- Heuristic extraction used for fast fallback without LLM
+- Gemini integration is optional to handle cost and quota limits
+
+## Limitations
+
+- In-memory FAISS index (not persistent across restarts)
+- Basic sentiment and extraction without fine-tuned models
+- Not optimized for large-scale production workloads
+
 ## Quick Start
 
 1. Create a virtual environment and activate it.

@@ -6,17 +6,28 @@ let baseUploadStatusText = "";
 let geminiCooldownTimer = null;
 let geminiCooldownRemaining = 0;
 let geminiRetryingNowTimeout = null;
+let selectedFiles = [];
 const ALL_MEETINGS_VALUE = "__ALL_MEETINGS__";
 
 const fileInput = document.getElementById("fileInput");
+const dropZone = document.getElementById("dropZone");
 const projectInput = document.getElementById("projectInput");
 const meetingDateInput = document.getElementById("meetingDateInput");
 const uploadBtn = document.getElementById("uploadBtn");
 const uploadStatus = document.getElementById("uploadStatus");
+const uploadProgressBar = document.getElementById("uploadProgressBar");
+const uploadProgressText = document.getElementById("uploadProgressText");
+const statMeetings = document.getElementById("statMeetings");
+const statProjects = document.getElementById("statProjects");
+const statActions = document.getElementById("statActions");
+const statWords = document.getElementById("statWords");
+const recentMeetings = document.getElementById("recentMeetings");
 const metadataBox = document.getElementById("metadataBox");
 const decisionsList = document.getElementById("decisionsList");
 const actionsTableBody = document.getElementById("actionsTableBody");
 const sentimentTimeline = document.getElementById("sentimentTimeline");
+const sentimentBars = document.getElementById("sentimentBars");
+const flaggedSegment = document.getElementById("flaggedSegment");
 const speakerSummaryBody = document.getElementById("speakerSummaryBody");
 const questionInput = document.getElementById("questionInput");
 const askBtn = document.getElementById("askBtn");
@@ -25,6 +36,91 @@ const chatMode = document.getElementById("chatMode");
 const answerBox = document.getElementById("answerBox");
 const sourcesList = document.getElementById("sourcesList");
 const geminiBadge = document.getElementById("geminiBadge");
+const exportCsvBtn = document.getElementById("exportCsvBtn");
+const exportPdfBtn = document.getElementById("exportPdfBtn");
+
+function updateUploadProgress(percent) {
+  const value = Math.max(0, Math.min(100, Math.floor(percent || 0)));
+  if (uploadProgressBar) {
+    uploadProgressBar.style.width = `${value}%`;
+  }
+  if (uploadProgressText) {
+    uploadProgressText.textContent = value > 0 && value < 100 ? `Upload progress: ${value}%` : "";
+  }
+}
+
+function applySelectedFiles(filesLike) {
+  selectedFiles = Array.from(filesLike || []);
+  if (uploadProgressText && selectedFiles.length) {
+    uploadProgressText.textContent = `Selected: ${selectedFiles.map((f) => f.name).join(", ")}`;
+  }
+}
+
+async function loadDashboard() {
+  try {
+    const response = await fetch("/api/dashboard");
+    if (!response.ok) {
+      return;
+    }
+
+    const data = await response.json();
+    const stats = data.stats || {};
+    if (statMeetings) statMeetings.textContent = String(stats.total_meetings || 0);
+    if (statProjects) statProjects.textContent = String(stats.total_projects || 0);
+    if (statActions) statActions.textContent = String(stats.total_action_items || 0);
+    if (statWords) statWords.textContent = String(stats.total_words || 0);
+
+    if (recentMeetings) {
+      recentMeetings.innerHTML = "";
+      const recent = data.meetings || [];
+      if (!recent.length) {
+        const li = document.createElement("li");
+        li.textContent = "No meetings uploaded yet.";
+        recentMeetings.appendChild(li);
+      } else {
+        recent.forEach((meeting) => {
+          const li = document.createElement("li");
+          li.textContent = `${meeting.project} | ${meeting.filename} | ${meeting.meeting_date}`;
+          recentMeetings.appendChild(li);
+        });
+      }
+    }
+  } catch {
+    // Keep dashboard blank if endpoint fails.
+  }
+}
+
+function uploadWithProgress(formData) {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", "/api/upload", true);
+
+    xhr.upload.onprogress = (event) => {
+      if (event.lengthComputable) {
+        updateUploadProgress((event.loaded / event.total) * 100);
+      }
+    };
+
+    xhr.onload = () => {
+      updateUploadProgress(100);
+      let payload = {};
+      try {
+        payload = JSON.parse(xhr.responseText || "{}");
+      } catch {
+        payload = {};
+      }
+
+      if (xhr.status >= 200 && xhr.status < 300) {
+        resolve(payload);
+      } else {
+        reject(new Error(payload.error || "Upload failed"));
+      }
+    };
+
+    xhr.onerror = () => reject(new Error("Upload failed"));
+    xhr.send(formData);
+  });
+}
 
 function stopGeminiCooldownTicker() {
   if (geminiCooldownTimer) {
@@ -354,9 +450,34 @@ function sentimentClass(sentiment) {
 function renderSentiment(sentiment) {
   sentimentTimeline.innerHTML = "";
   speakerSummaryBody.innerHTML = "";
+  if (sentimentBars) {
+    sentimentBars.innerHTML = "";
+  }
 
   const timeline = (sentiment && sentiment.timeline) || [];
   const speakerSummary = (sentiment && sentiment.speaker_summary) || [];
+  const totals = (sentiment && sentiment.totals) || {};
+
+  const toneStats = [
+    { key: "agreement", label: "Agreement", value: Number(totals.agreement || 0) },
+    { key: "conflict", label: "Conflict", value: Number(totals.conflict || 0) },
+    { key: "frustration", label: "Frustration", value: Number(totals.frustration || 0) },
+    { key: "neutral", label: "Neutral", value: Number(totals.neutral || 0) },
+  ];
+  const maxToneValue = Math.max(1, ...toneStats.map((item) => item.value));
+
+  if (sentimentBars) {
+    toneStats.forEach((item) => {
+      const row = document.createElement("div");
+      row.className = "tone-row";
+      row.innerHTML = `<span>${item.label}</span><div class="tone-track"><div class="tone-fill tone-${item.key}" style="width:${(item.value / maxToneValue) * 100}%"></div></div><strong>${item.value}</strong>`;
+      sentimentBars.appendChild(row);
+    });
+  }
+
+  if (flaggedSegment) {
+    flaggedSegment.textContent = "Click a timeline item to view the original flagged segment.";
+  }
 
   if (!timeline.length) {
     const li = document.createElement("li");
@@ -367,6 +488,13 @@ function renderSentiment(sentiment) {
       const li = document.createElement("li");
       li.className = "timeline-item";
       li.innerHTML = `<span class="sentiment-chip ${sentimentClass(entry.sentiment)}">${entry.sentiment}</span> <strong>${entry.speaker}</strong>: ${entry.text}`;
+      li.addEventListener("click", () => {
+        if (flaggedSegment) {
+          flaggedSegment.textContent = `${entry.speaker} | ${entry.sentiment.toUpperCase()}\n\n${entry.text}`;
+        }
+        sentimentTimeline.querySelectorAll(".timeline-item.active").forEach((node) => node.classList.remove("active"));
+        li.classList.add("active");
+      });
       sentimentTimeline.appendChild(li);
     });
   }
@@ -467,6 +595,7 @@ function buildMergedInsights(meetingsList) {
 function buildMergedSentiment(meetingsList) {
   const timeline = [];
   const speakerSummaryMap = new Map();
+  const totals = { agreement: 0, conflict: 0, frustration: 0, neutral: 0 };
 
   meetingsList.forEach((meeting) => {
     const sentiment = meeting.sentiment || {};
@@ -478,6 +607,9 @@ function buildMergedSentiment(meetingsList) {
         sentiment: entry.sentiment,
         text: `[${meetingLabel}] ${entry.text}`,
       });
+      if (entry.sentiment && totals[entry.sentiment] !== undefined) {
+        totals[entry.sentiment] += 1;
+      }
     });
 
     (sentiment.speaker_summary || []).forEach((item) => {
@@ -502,17 +634,70 @@ function buildMergedSentiment(meetingsList) {
     speaker_summary: Array.from(speakerSummaryMap.values()).sort((a, b) =>
       a.speaker.localeCompare(b.speaker),
     ),
+    totals,
   };
 }
 
+if (fileInput) {
+  fileInput.addEventListener("change", () => {
+    applySelectedFiles(fileInput.files);
+  });
+}
+
+if (dropZone) {
+  ["dragenter", "dragover"].forEach((eventName) => {
+    dropZone.addEventListener(eventName, (event) => {
+      event.preventDefault();
+      dropZone.classList.add("drag-active");
+    });
+  });
+
+  ["dragleave", "drop"].forEach((eventName) => {
+    dropZone.addEventListener(eventName, (event) => {
+      event.preventDefault();
+      dropZone.classList.remove("drag-active");
+    });
+  });
+
+  dropZone.addEventListener("drop", (event) => {
+    const files = event.dataTransfer ? event.dataTransfer.files : [];
+    if (!files || !files.length) {
+      return;
+    }
+    applySelectedFiles(files);
+    try {
+      fileInput.files = files;
+    } catch {
+      // Assignment may fail in some browsers; selectedFiles still tracks dropped files.
+    }
+  });
+}
+
+function handleExport(format) {
+  const params = new URLSearchParams({ format });
+  if (activeMeetingId) {
+    params.set("meeting_id", activeMeetingId);
+  }
+  window.location.href = `/api/export?${params.toString()}`;
+}
+
+if (exportCsvBtn) {
+  exportCsvBtn.addEventListener("click", () => handleExport("csv"));
+}
+
+if (exportPdfBtn) {
+  exportPdfBtn.addEventListener("click", () => handleExport("pdf"));
+}
+
 uploadBtn.addEventListener("click", async () => {
-  const files = Array.from(fileInput.files || []);
+  const files = selectedFiles.length ? selectedFiles : Array.from(fileInput.files || []);
   if (!files.length) {
     uploadStatus.textContent = "Choose one or more .txt/.vtt files first.";
     return;
   }
 
   uploadStatus.textContent = "Uploading and processing transcript...";
+  updateUploadProgress(0);
   setGeminiCooldownBadge(false, 0);
   metadataBox.textContent = "";
 
@@ -529,15 +714,7 @@ uploadBtn.addEventListener("click", async () => {
   }
 
   try {
-    const response = await fetch("/api/upload", {
-      method: "POST",
-      body: formData,
-    });
-
-    const data = await response.json();
-    if (!response.ok) {
-      throw new Error(data.error || "Upload failed");
-    }
+    const data = await uploadWithProgress(formData);
 
     const uploads = data.uploads || [];
     uploadedMeetings = uploads.length ? uploads : [data];
@@ -568,11 +745,15 @@ uploadBtn.addEventListener("click", async () => {
     baseUploadStatusText = `Uploaded ${uploadedMeetings.length} file(s): ${uploadedNames} | Project: ${data.project} | Date: ${data.meeting_date} | ${contextText}`;
     updateEnhancementStatusLine();
     startEnhancementPolling();
+    loadDashboard();
   } catch (error) {
     stopEnhancementPolling();
+    updateUploadProgress(0);
     uploadStatus.textContent = `Error: ${error.message}`;
   }
 });
+
+loadDashboard();
 
 askBtn.addEventListener("click", async () => {
   const question = questionInput.value.trim();

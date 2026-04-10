@@ -1,9 +1,12 @@
 import os
 import threading
 import time
+import io
+import csv
+import importlib
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-from flask import Flask, jsonify, render_template, request
+from flask import Flask, jsonify, render_template, request, send_file
 
 from utils.analytics import analyze_sentiment, extract_speaker_metadata
 from utils.extractor import enhance_insights_with_gemini, extract_insights_fast
@@ -68,6 +71,7 @@ def _run_gemini_enhancement(meeting_id, transcript_text):
 
     with enhancement_lock:
         meeting_insights[meeting_id] = enhanced
+    storage.update_meeting_insights(meeting_id, enhanced)
     _set_enhancement_state(meeting_id, "completed")
 
 
@@ -93,6 +97,164 @@ def build_metadata(text, filename, speaker_meta=None):
     return metadata
 
 
+def _collect_export_items(meeting_id=None):
+    if meeting_id:
+        ids = [meeting_id] if meeting_id in meeting_insights else []
+    else:
+        ids = list(meeting_insights.keys())
+
+    decisions = []
+    action_items = []
+    for mid in ids:
+        insights = meeting_insights.get(mid) or {}
+        record = meetings.get(mid) or {}
+        filename = record.get("filename") or mid
+
+        for decision in insights.get("decisions", []):
+            decisions.append({"meeting_id": mid, "filename": filename, "decision": decision})
+
+        for item in insights.get("action_items", []):
+            action_items.append(
+                {
+                    "meeting_id": mid,
+                    "filename": filename,
+                    "person": item.get("person", ""),
+                    "task": item.get("task", ""),
+                    "deadline": item.get("deadline", ""),
+                }
+            )
+
+    return decisions, action_items
+
+
+def _build_csv_export(meeting_id=None):
+    decisions, action_items = _collect_export_items(meeting_id)
+    buffer = io.StringIO()
+    writer = csv.writer(buffer)
+
+    writer.writerow(["Decisions"])
+    writer.writerow(["meeting_id", "filename", "decision"])
+    for row in decisions:
+        writer.writerow([row["meeting_id"], row["filename"], row["decision"]])
+
+    writer.writerow([])
+    writer.writerow(["Action Items"])
+    writer.writerow(["meeting_id", "filename", "person", "task", "deadline"])
+    for row in action_items:
+        writer.writerow([row["meeting_id"], row["filename"], row["person"], row["task"], row["deadline"]])
+
+    csv_bytes = io.BytesIO(buffer.getvalue().encode("utf-8"))
+    csv_bytes.seek(0)
+    return csv_bytes
+
+
+def _build_pdf_export(meeting_id=None):
+    try:
+        pagesizes = importlib.import_module("reportlab.lib.pagesizes")
+        pdfgen = importlib.import_module("reportlab.pdfgen")
+        LETTER = pagesizes.LETTER
+        canvas = pdfgen.canvas
+    except Exception:
+        decisions, action_items = _collect_export_items(meeting_id)
+        lines = ["Meeting Intelligence Hub - Export", "", "Decisions"]
+        lines.extend([f"[{row['filename']}] {row['decision']}" for row in decisions])
+        lines.extend(["", "Action Items"])
+        lines.extend(
+            [
+                f"[{row['filename']}] {row['person']} | {row['task']} | {row['deadline']}"
+                for row in action_items
+            ]
+        )
+
+        # Minimal PDF generator fallback (single page, Helvetica).
+        escaped_lines = []
+        for line in lines[:42]:
+            escaped = (
+                str(line)
+                .replace("\\", "\\\\")
+                .replace("(", "\\(")
+                .replace(")", "\\)")
+            )
+            escaped_lines.append(escaped[:110])
+
+        stream_parts = ["BT", "/F1 11 Tf", "40 770 Td", "14 TL"]
+        first = True
+        for line in escaped_lines:
+            if first:
+                stream_parts.append(f"({line}) Tj")
+                first = False
+            else:
+                stream_parts.append("T*")
+                stream_parts.append(f"({line}) Tj")
+        stream_parts.append("ET")
+        stream = "\n".join(stream_parts).encode("utf-8")
+
+        objs = []
+        objs.append(b"1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj\n")
+        objs.append(b"2 0 obj << /Type /Pages /Kids [3 0 R] /Count 1 >> endobj\n")
+        objs.append(
+            b"3 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] "
+            b"/Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >> endobj\n"
+        )
+        objs.append(b"4 0 obj << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> endobj\n")
+        objs.append(
+            f"5 0 obj << /Length {len(stream)} >> stream\n".encode("utf-8")
+            + stream
+            + b"\nendstream endobj\n"
+        )
+
+        pdf = bytearray(b"%PDF-1.4\n")
+        offsets = [0]
+        for obj in objs:
+            offsets.append(len(pdf))
+            pdf.extend(obj)
+        xref_start = len(pdf)
+        pdf.extend(f"xref\n0 {len(offsets)}\n".encode("utf-8"))
+        pdf.extend(b"0000000000 65535 f \n")
+        for off in offsets[1:]:
+            pdf.extend(f"{off:010d} 00000 n \n".encode("utf-8"))
+        pdf.extend(
+            f"trailer << /Size {len(offsets)} /Root 1 0 R >>\nstartxref\n{xref_start}\n%%EOF\n".encode(
+                "utf-8"
+            )
+        )
+        return io.BytesIO(pdf)
+
+    decisions, action_items = _collect_export_items(meeting_id)
+    packet = io.BytesIO()
+    pdf = canvas.Canvas(packet, pagesize=LETTER)
+    width, height = LETTER
+    y = height - 40
+
+    def write_line(text, step=16):
+        nonlocal y
+        if y < 50:
+            pdf.showPage()
+            y = height - 40
+        pdf.drawString(40, y, text[:120])
+        y -= step
+
+    pdf.setFont("Helvetica-Bold", 14)
+    write_line("Meeting Intelligence Hub - Export", step=22)
+
+    pdf.setFont("Helvetica-Bold", 12)
+    write_line("Decisions")
+    pdf.setFont("Helvetica", 10)
+    for row in decisions:
+        write_line(f"[{row['filename']}] {row['decision']}")
+
+    y -= 8
+    pdf.setFont("Helvetica-Bold", 12)
+    write_line("Action Items")
+    pdf.setFont("Helvetica", 10)
+    for row in action_items:
+        write_line(f"[{row['filename']}] {row['person']} | {row['task']} | {row['deadline']}")
+
+    pdf.save()
+    packet.seek(0)
+    return packet
+
+
 @app.route("/")
 def home():
     return render_template("index.html")
@@ -109,6 +271,46 @@ def list_meetings():
     meeting_date = (request.args.get("meeting_date") or "").strip() or None
     ordered = storage.list_meetings(project=project, meeting_date=meeting_date)
     return jsonify({"meetings": ordered})
+
+
+@app.route("/api/dashboard", methods=["GET"])
+def dashboard_stats():
+    summary = storage.dashboard_summary()
+
+    return jsonify(
+        {
+            "stats": {
+                "total_meetings": summary["total_meetings"],
+                "total_projects": summary["total_projects"],
+                "total_words": summary["total_words"],
+                "total_action_items": summary["total_action_items"],
+            },
+            "meetings": summary["recent_meetings"],
+        }
+    )
+
+
+@app.route("/api/export", methods=["GET"])
+def export_insights():
+    export_format = (request.args.get("format") or "csv").strip().lower()
+    meeting_id = (request.args.get("meeting_id") or "").strip() or None
+
+    if meeting_id and meeting_id not in meeting_insights:
+        return jsonify({"error": "Unknown meeting_id for export"}), 404
+
+    if export_format == "csv":
+        payload = _build_csv_export(meeting_id)
+        filename = f"meeting_insights_{meeting_id or 'all'}.csv"
+        return send_file(payload, as_attachment=True, download_name=filename, mimetype="text/csv")
+
+    if export_format == "pdf":
+        payload = _build_pdf_export(meeting_id)
+        if payload is None:
+            return jsonify({"error": "PDF export requires reportlab package"}), 400
+        filename = f"meeting_insights_{meeting_id or 'all'}.pdf"
+        return send_file(payload, as_attachment=True, download_name=filename, mimetype="application/pdf")
+
+    return jsonify({"error": "Unsupported export format. Use csv or pdf"}), 400
 
 
 @app.route("/api/insights_status", methods=["GET"])
@@ -195,6 +397,7 @@ def upload_transcript():
             "meeting_date": meeting_date,
             "uploaded_at": uploaded_at,
             "metadata": metadata,
+            "insights": insights,
         }
         meetings[meeting_id] = meeting_record
         with enhancement_lock:

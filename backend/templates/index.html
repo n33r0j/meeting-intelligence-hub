@@ -18,16 +18,33 @@
       </header>
 
       <section class="card">
+        <h2>Dashboard Home</h2>
+        <div class="stats-grid">
+          <div class="stat-card"><span>Total Meetings</span><strong id="statMeetings">0</strong></div>
+          <div class="stat-card"><span>Total Projects</span><strong id="statProjects">0</strong></div>
+          <div class="stat-card"><span>Total Action Items</span><strong id="statActions">0</strong></div>
+          <div class="stat-card"><span>Total Words</span><strong id="statWords">0</strong></div>
+        </div>
+        <h3>Recent Meetings</h3>
+        <ul id="recentMeetings" class="recent-list"></ul>
+      </section>
+
+      <section class="card">
         <h2>1) Upload Transcript</h2>
         <p class="section-note">Add one or more .txt or .vtt files. You will see draft insights immediately, then enhanced insights when available.</p>
         <div class="row">
           <input id="projectInput" type="text" placeholder="Project name (for example: Launch Revamp)" />
           <input id="meetingDateInput" type="date" />
         </div>
+        <div id="dropZone" class="drop-zone">Drag and drop transcript files here, or use file browser below.</div>
         <div class="row">
           <input id="fileInput" type="file" accept=".txt,.vtt" multiple />
           <button id="uploadBtn">Upload And Analyze</button>
         </div>
+        <div class="progress-wrap">
+          <div id="uploadProgressBar" class="progress-bar"></div>
+        </div>
+        <p id="uploadProgressText" class="status"></p>
         <p id="uploadStatus" class="status"></p>
         <pre id="metadataBox" class="codebox"></pre>
       </section>
@@ -38,6 +55,10 @@
           <h3>Decisions</h3>
           <ul id="decisionsList"></ul>
           <h3>Action Items</h3>
+          <div class="row">
+            <button id="exportCsvBtn" type="button">Export CSV</button>
+            <button id="exportPdfBtn" type="button">Export PDF</button>
+          </div>
           <div class="table-wrap">
             <table>
               <thead>
@@ -52,7 +73,9 @@
           </div>
 
           <h3>Sentiment Timeline</h3>
+          <div id="sentimentBars" class="sentiment-bars"></div>
           <ul id="sentimentTimeline" class="timeline-list"></ul>
+          <pre id="flaggedSegment" class="codebox">Click a timeline item to view the original flagged segment.</pre>
 
           <h3>Speaker Sentiment Summary</h3>
           <div class="table-wrap">
