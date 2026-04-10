@@ -1,6 +1,6 @@
 # Meeting Intelligence Hub (MVP)
 
-Lean, interview-ready MVP that converts meeting transcripts into structured insights and a searchable Q&A assistant.
+A lightweight AI system that transforms meeting transcripts into actionable insights and enables intelligent search through conversational Q&A.
 
 ## Features
 
